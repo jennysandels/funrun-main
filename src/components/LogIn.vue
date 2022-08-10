@@ -1,7 +1,16 @@
 <template>
-  <div class="col-md-12">
-    <div class="card card-container">
-      <Form @submit="handleLogin" :validation-schema="schema">
+  <v-container>
+    <v-row>
+      <v-col cols="5">
+        <v-card
+            title="Join the Campaign!"
+            subtitle='the campaign description needs to go here!'>
+          <v-img src="../assets/funrunpic.png"></v-img>
+        </v-card>
+      </v-col>
+      <v-col cols="7">
+        <v-container>
+        <Form @submit="handleLogin" :validation-schema="schema">
         <div class="form-group">
           <label for="email">Email</label>
           <Field name="email" type="text" class="form-control" />
@@ -27,8 +36,10 @@
           </div>
         </div>
       </Form>
-    </div>
-  </div>
+        </v-container>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
 <script>
 import { Form, Field, ErrorMessage } from "vee-validate";

@@ -18,5 +18,11 @@ class DonationDataService {
     getTotalByTeam(team_id) {
         return http.get(`/donations/teamtotals/${team_id}`);
     }
+    getCountByTeam(team_id) {
+        return http.get(`/donations/teamcount/${team_id}`);
+    }
+    getByTeam(team_id) {
+        return http.get(`/donations/team/${team_id}`);
+    }
 }
 export default new DonationDataService();
