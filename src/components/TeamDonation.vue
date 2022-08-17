@@ -39,9 +39,11 @@
               label="Include a message with your donation"
           ></v-textarea>
           <div id="card-container"></div>
-          <v-btn id="card-button">Donate!</v-btn>
+          <button type="button" ref="cardButton">
+            Make Donation
+          </button>
         </v-container>
-        <div id="payment-status-container"></div>
+        <div ref="paymentStatusContainer"></div>
       </v-card>
     </v-col>
     <v-col cols="4">
@@ -58,13 +60,18 @@
 import TeamDataService from "@/services/TeamDataService";
 import DonationDataService from "@/services/DonationDataService";
 import CampaignDataService from "@/services/CampaignDataService";
+const { json, send } = require('micro');
+const retry = require('async-retry');
+// square provides the API client and error types
+const { ApiError } = require('../plugins/square');
+const { nanoid } = require('nanoid');
 
 export default {
   name: "TeamDonation",
   mounted() {
-    let squareScript = document.createElement('script')
-    squareScript.setAttribute('src', 'https://sandbox.web.squarecdn.com/v1/square.js')
-    document.head.appendChild(squareScript)
+    let squareScript = document.createElement('script');
+    squareScript.setAttribute('src', 'https://sandbox.web.squarecdn.com/v1/square.js');
+    document.head.appendChild(squareScript);
   },
   data() {
     return {
@@ -86,121 +93,35 @@ export default {
           return pattern.test(value) || 'Invalid e-mail.'
         },
       },
-
+      errors: [],
+      card: null,
+      appId: 'sandbox-sq0idb-KG8rn1niVaCqF_E0O8gKqg',
+      locationId: 'LCR64W6EC3HBB',
+      payments: null,
     }
   },
   created() {
-    const appId = 'sandbox-sq0idb-KG8rn1niVaCqF_E0O8gKqg';
-    const locationId = 'LCR64W6EC3HBB';
-
     window.addEventListener('load', () => {
+      this.initializeCard();
+    });
+  },
+  methods: {
+    async initializeCard() {
       if (!window.Square) {
         throw new Error('Square.js failed to load properly');
       }
 
-      const payments = window.Square.payments(appId, locationId);
-      let card;
-      try {
-        card = initializeCard(payments);
-      } catch (e) {
-        console.error('Initializing Card failed', e);
-        return;
-      }
+      const payments = window.Square.payments(this.appId, this.locationId);
 
-      // Checkpoint 2.
-      async function handlePaymentMethodSubmission(event, paymentMethod) {
-        event.preventDefault();
+      let card = await payments.card();
+      await card.attach('#card-container');
 
-        try {
-          // disable the submit button as we await tokenization and make a
-          // payment request.
-          cardButton.disabled = true;
-          const token = await tokenize(paymentMethod);
-          const paymentResults = await createPayment(token);
-          displayPaymentResults('SUCCESS');
-
-          console.debug('Payment Success', paymentResults);
-        } catch (e) {
-          cardButton.disabled = false;
-          displayPaymentResults('FAILURE');
-          console.error(e.message);
-        }
-      }
-
-      const cardButton = document.getElementById(
-          'card-button'
-      );
-      cardButton.addEventListener('click', async function (event) {
-        await handlePaymentMethodSubmission(event, card);
-      });
-
-      async function initializeCard(payments) {
-        const card = await payments.card();
-        await card.attach('#card-container');
-        return card;
-      }
-
-      // Call this function to send a payment token, buyer name, and other details
-      // to the project server code so that a payment can be created with
-      // Payments API
-      async function createPayment(token) {
-        const body = JSON.stringify({
-          locationId,
-          sourceId: token,
-        });
-        const paymentResponse = await fetch('/payment', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body,
-        });
-        if (paymentResponse.ok) {
-          return paymentResponse.json();
-        }
-        const errorBody = await paymentResponse.text();
-        throw new Error(errorBody);
-      }
-
-      // This function tokenizes a payment method.
-      // The ‘error’ thrown from this async function denotes a failed tokenization,
-      // which is due to buyer error (such as an expired card). It is up to the
-      // developer to handle the error and provide the buyer the chance to fix
-      // their mistakes.
-      async function tokenize(paymentMethod) {
-        const tokenResult = await paymentMethod.tokenize();
-        if (tokenResult.status === 'OK') {
-          return tokenResult.token;
-        } else {
-          let errorMessage = `Tokenization failed-status: ${tokenResult.status}`;
-          if (tokenResult.errors) {
-            errorMessage += ` and errors: ${JSON.stringify(
-                tokenResult.errors
-            )}`;
-          }
-          throw new Error(errorMessage);
-        }
-      }
-
-      // Helper method for displaying the Payment Status on the screen.
-      // status is either SUCCESS or FAILURE;
-      function displayPaymentResults(status) {
-        const statusContainer = document.getElementById(
-            'payment-status-container'
-        );
-        if (status === 'SUCCESS') {
-          statusContainer.classList.remove('is-failure');
-          statusContainer.classList.add('is-success');
-        } else {
-          statusContainer.classList.remove('is-success');
-          statusContainer.classList.add('is-failure');
-        }
-
-        statusContainer.style.visibility = 'visible';
-      }
-    })
-  },
-  methods: {
+      var self = this;
+      this.$refs.cardButton.addEventListener("click", async function () {
+        const tokenResult = await card.tokenize()
+        self.make_payment(tokenResult)
+      })
+    },
     getTeam() {
       TeamDataService.get(this.$route.params.team_id)
           .then(response => {
@@ -216,6 +137,21 @@ export default {
           .catch(e => {
             console.log(e);
           });
+    },
+    async make_payment(tokenResult) {
+      if ((tokenResult.status == "OK") && (tokenResult.token.length)) {
+        // disable the submit button as we await tokenization and make a
+        // payment request.
+        const paymentResults = this.createPayment(tokenResult);
+        this.displayPaymentResults('SUCCESS');
+
+        console.debug('Payment Success', paymentResults);
+      } else {
+        //cardButton.disabled = false;
+        this.displayPaymentResults('FAILURE');
+        console.error(tokenResult.message);
+      }
+
     },
     getTeamTotal() {
       DonationDataService.getTotalByTeam(this.team_id)
@@ -239,6 +175,116 @@ export default {
             console.log(e);
           });
     },
+    async createPayment(token) {
+      const locationId = this.locationId;
+      const body = JSON.stringify({
+        locationId,
+        sourceId: token,
+      });
+
+      const payload = await json(body);
+      console.debug(JSON.stringify(payload));
+      // We validate the payload for specific fields. You may disable this feature
+      // if you would prefer to handle payload validation on your own.
+//      if (!validatePaymentPayload(payload)) {
+//        throw createError(400, 'Bad Request');
+//      }
+      let res = null;
+      await retry(async (bail, attempt) => {
+        try {
+          console.debug('Creating payment', { attempt });
+
+          const idempotencyKey = payload.idempotencyKey || nanoid();
+          const payment = {
+            idempotencyKey,
+            locationId: payload.locationId,
+            sourceId: payload.sourceId,
+            // While it's tempting to pass this data from the client
+            // Doing so allows bad actor to modify these values
+            // Instead, leverage Orders to create an order on the server
+            // and pass the Order ID to createPayment rather than raw amounts
+            // See Orders documentation: https://developer.squareup.com/docs/orders-api/what-it-does
+            amountMoney: {
+              // the expected amount is in cents, meaning this is $1.00.
+              amount: '100',
+              // If you are a non-US account, you must change the currency to match the country in which
+              // you are accepting the payment.
+              currency: 'USD',
+            },
+          };
+
+          if (payload.customerId) {
+            payment.customerId = payload.customerId;
+          }
+
+          // VerificationDetails is part of Secure Card Authentication.
+          // This part of the payload is highly recommended (and required for some countries)
+          // for 'unauthenticated' payment methods like Cards.
+          if (payload.verificationToken) {
+            payment.verificationToken = payload.verificationToken;
+          }
+
+          const { result, statusCode } = await window.Square.paymentsApi.createPayment(
+              payment
+          );
+
+          console.info('Payment succeeded!', { result, statusCode });
+
+          send(res, statusCode, {
+            success: true,
+            payment: {
+              id: result.payment.id,
+              status: result.payment.status,
+              receiptUrl: result.payment.receiptUrl,
+              orderId: result.payment.orderId,
+            },
+          });
+        } catch (ex) {
+          if (ex instanceof ApiError) {
+            // likely an error in the request. don't retry
+            console.error(ex.errors);
+            bail(ex);
+          } else {
+            // IDEA: send to error reporting service
+            console.error(`Error creating payment on attempt ${attempt}: ${ex}`);
+            throw ex; // to attempt retry
+          }
+        }
+      });
+
+
+      if (res.ok) {
+          return res.json();
+        }
+        const errorBody = res.text();
+        throw new Error(errorBody);
+    },
+    tokenize() {
+      const tokenResult = this.card.tokenize();
+      if (tokenResult.status === 'OK') {
+        return tokenResult.token;
+      } else {
+        let errorMessage = `Tokenization failed-status: ${tokenResult.status}`;
+        if (tokenResult.errors) {
+          errorMessage += ` and errors: ${JSON.stringify(
+              tokenResult.errors
+          )}`;
+        }
+        throw new Error(errorMessage);
+      }
+    },
+    displayPaymentResults(status) {
+      const statusContainer = this.$refs.paymentStatusContainer;
+      if (status === 'SUCCESS') {
+        statusContainer.classList.remove('is-failure');
+        statusContainer.classList.add('is-success');
+      } else {
+        statusContainer.classList.remove('is-success');
+        statusContainer.classList.add('is-failure');
+      }
+
+      statusContainer.style.visibility = 'visible';
+    }
   }
 }
 </script>
