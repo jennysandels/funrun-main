@@ -6,7 +6,7 @@
                 color="orange-darken-4"
             >
               <template v-slot:image>
-                <v-img src="./assets/background.jpeg"
+                <v-img src="./assets/comic-style-background.png"
                 ></v-img>
               </template>
 

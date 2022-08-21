@@ -10,7 +10,7 @@
               label="Donation Amount"
               placeholder="10.00"
               prefix="$"
-              :v-model="donation.amount"
+              v-model="amount"
           ></v-text-field>
           <v-text-field
               label="Team"
@@ -21,21 +21,21 @@
           </p>
           <v-text-field
               label="First Name"
-              :v-model="donation.first_name"
+              v-model="first_name"
               :rules="[rules.required]"
           ></v-text-field>
           <v-text-field
               label="Last Name"
-              :v-model="donation.last_name"
+              v-model="last_name"
               :rules="[rules.required]"
           ></v-text-field>
           <v-text-field
-              :v-model="donation.email"
+              v-model="email"
               :rules="[rules.required, rules.email]"
               label="E-mail"
           ></v-text-field>
           <v-textarea
-              :v-model="donation.message"
+              v-model="message"
               label="Include a message with your donation"
           ></v-textarea>
           <div id="card-container"></div>
@@ -60,11 +60,7 @@
 import TeamDataService from "@/services/TeamDataService";
 import DonationDataService from "@/services/DonationDataService";
 import CampaignDataService from "@/services/CampaignDataService";
-const { json, send } = require('micro');
-const retry = require('async-retry');
-// square provides the API client and error types
-const { ApiError } = require('../plugins/square');
-const { nanoid } = require('nanoid');
+import PaymentDataService from "@/services/PaymentDataService";
 
 export default {
   name: "TeamDonation",
@@ -75,9 +71,11 @@ export default {
   },
   data() {
     return {
-      donation: {
-        amount: 10.00
-      },
+      amount: 10.00,
+      first_name: "",
+      last_name: "",
+      email: "",
+      message: "",
       team: this.getTeam(),
       title: "Not yet set!",
       team_id: 0,
@@ -106,6 +104,10 @@ export default {
     });
   },
   methods: {
+    inputData($event) {
+      // Value will update reactively
+      $event.target.value;
+    },
     async initializeCard() {
       if (!window.Square) {
         throw new Error('Square.js failed to load properly');
@@ -142,16 +144,30 @@ export default {
       if ((tokenResult.status == "OK") && (tokenResult.token.length)) {
         // disable the submit button as we await tokenization and make a
         // payment request.
-        const paymentResults = this.createPayment(tokenResult);
-        this.displayPaymentResults('SUCCESS');
-
-        console.debug('Payment Success', paymentResults);
-      } else {
-        //cardButton.disabled = false;
-        this.displayPaymentResults('FAILURE');
-        console.error(tokenResult.message);
+        //moving this to the api server
+        //const paymentResults = this.createPayment(tokenResult.token);
+        const payment = {
+          campaign_id: this.campaign_id,
+          location_id: this.locationId,
+          team_id: this.team_id,
+          source_id: tokenResult.token,
+          amount: this.amount,
+          first_name: this.first_name,
+          last_name: this.last_name,
+          email: this.email,
+          message: this.message
+        };
+        console.info("Sending payment info", {payment});
+        PaymentDataService.create(payment)
+            .then(paymentResults => {
+              this.displayPaymentResults('SUCCESS');
+              console.debug('Payment Success', paymentResults);
+            }).catch(e => {
+          //cardButton.disabled = false;
+          this.displayPaymentResults('FAILURE');
+          console.error(e);
+        });
       }
-
     },
     getTeamTotal() {
       DonationDataService.getTotalByTeam(this.team_id)
@@ -174,104 +190,6 @@ export default {
           .catch(e => {
             console.log(e);
           });
-    },
-    async createPayment(token) {
-      const locationId = this.locationId;
-      const body = JSON.stringify({
-        locationId,
-        sourceId: token,
-      });
-
-      const payload = await json(body);
-      console.debug(JSON.stringify(payload));
-      // We validate the payload for specific fields. You may disable this feature
-      // if you would prefer to handle payload validation on your own.
-//      if (!validatePaymentPayload(payload)) {
-//        throw createError(400, 'Bad Request');
-//      }
-      let res = null;
-      await retry(async (bail, attempt) => {
-        try {
-          console.debug('Creating payment', { attempt });
-
-          const idempotencyKey = payload.idempotencyKey || nanoid();
-          const payment = {
-            idempotencyKey,
-            locationId: payload.locationId,
-            sourceId: payload.sourceId,
-            // While it's tempting to pass this data from the client
-            // Doing so allows bad actor to modify these values
-            // Instead, leverage Orders to create an order on the server
-            // and pass the Order ID to createPayment rather than raw amounts
-            // See Orders documentation: https://developer.squareup.com/docs/orders-api/what-it-does
-            amountMoney: {
-              // the expected amount is in cents, meaning this is $1.00.
-              amount: '100',
-              // If you are a non-US account, you must change the currency to match the country in which
-              // you are accepting the payment.
-              currency: 'USD',
-            },
-          };
-
-          if (payload.customerId) {
-            payment.customerId = payload.customerId;
-          }
-
-          // VerificationDetails is part of Secure Card Authentication.
-          // This part of the payload is highly recommended (and required for some countries)
-          // for 'unauthenticated' payment methods like Cards.
-          if (payload.verificationToken) {
-            payment.verificationToken = payload.verificationToken;
-          }
-
-          const { result, statusCode } = await window.Square.paymentsApi.createPayment(
-              payment
-          );
-
-          console.info('Payment succeeded!', { result, statusCode });
-
-          send(res, statusCode, {
-            success: true,
-            payment: {
-              id: result.payment.id,
-              status: result.payment.status,
-              receiptUrl: result.payment.receiptUrl,
-              orderId: result.payment.orderId,
-            },
-          });
-        } catch (ex) {
-          if (ex instanceof ApiError) {
-            // likely an error in the request. don't retry
-            console.error(ex.errors);
-            bail(ex);
-          } else {
-            // IDEA: send to error reporting service
-            console.error(`Error creating payment on attempt ${attempt}: ${ex}`);
-            throw ex; // to attempt retry
-          }
-        }
-      });
-
-
-      if (res.ok) {
-          return res.json();
-        }
-        const errorBody = res.text();
-        throw new Error(errorBody);
-    },
-    tokenize() {
-      const tokenResult = this.card.tokenize();
-      if (tokenResult.status === 'OK') {
-        return tokenResult.token;
-      } else {
-        let errorMessage = `Tokenization failed-status: ${tokenResult.status}`;
-        if (tokenResult.errors) {
-          errorMessage += ` and errors: ${JSON.stringify(
-              tokenResult.errors
-          )}`;
-        }
-        throw new Error(errorMessage);
-      }
     },
     displayPaymentResults(status) {
       const statusContainer = this.$refs.paymentStatusContainer;
