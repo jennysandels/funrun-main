@@ -54,6 +54,11 @@
               </div>
             </div>
           </Form>
+        <div>Already have an account?
+          <router-link to="/login">
+            <button class="btn btn-primary btn-block">Log In</button>
+          </router-link>
+        </div>
           <div
               v-if="message"
               class="alert"
@@ -69,6 +74,8 @@
 <script>
 import { Form, Field, ErrorMessage } from "vee-validate";
 import * as yup from "yup";
+import jwt from 'jwt-simple';
+import {SECRET} from "@/config/development";
 export default {
   name: "Register",
   components: {
@@ -160,7 +167,14 @@ export default {
       this.message = "";
       this.successful = false;
       this.loading = true;
-      this.$store.dispatch("auth/register", user).then(
+      const encoded_password = jwt.encode(user.password, SECRET);
+      const payload = {
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        password: encoded_password
+      }
+      this.$store.dispatch("auth/register", payload).then(
           (data) => {
             this.message = data.message;
             this.successful = true;

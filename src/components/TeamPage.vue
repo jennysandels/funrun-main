@@ -4,7 +4,7 @@
     <v-card-title>{{ this.title }}</v-card-title>
     <v-row>
       <v-col cols="7">
-        <v-img :src="`http://localhost:8080/api/teams/image/` + this.team_id"></v-img>
+        <v-img :src="this.team_img"></v-img>
       </v-col>
       <v-col cols="5">
         <v-card>
@@ -14,7 +14,7 @@
                 :model-value=this.getProgressValue()
                 height="30"
                 striped
-                color="deep-orange"
+                color="orange"
             >
               <template v-slot:default="{ value }">
                 <strong>{{ Math.ceil(value) }}% complete</strong>
@@ -23,10 +23,11 @@
           </v-container>
           <v-card-text>Raised by {{ this.count }} donors!</v-card-text>
           <v-container>
-            <v-btn color="deep-orange" :to="`/donation/team=` + this.team_id">Donate Now!</v-btn>
+            <v-btn color="orange-darken-3" :to="`/donation/team=` + this.team_id">Donate Now!</v-btn>
           </v-container>
           <v-container>
             <v-text-field readonly>Created by {{ this.first_name }}  {{ this.last_name }}</v-text-field>
+            <v-btn v-if="this.showEdit" color="orange-darken-3" :to="`/editteam/` + this.team_id">Edit Team</v-btn>
           </v-container>
         </v-card>
       </v-col>
@@ -54,10 +55,6 @@ import UserDataService from "@/services/UserDataService";
 
 export default {
   name: "TeamPage",
-
-  setup() {
-
-  },
   data() {
     return {
       team: this.getTeam(),
@@ -71,7 +68,9 @@ export default {
       user_id: 0,
       user: this.getOwner(),
       first_name: "",
-      last_name: ""
+      last_name: "",
+      team_img: "",
+      showEdit: false
     }
   },
   methods: {
@@ -83,12 +82,14 @@ export default {
             this.title = this.team.name;
             this.team_id = this.team.team_id;
             this.goal = this.team.team_goal;
+            this.team_img = this.team.team_img;
             this.team_description = this.team.description;
             this.user_id = this.team.user_id;
             this.user = this.getOwner(this.user_id);
             this.total = this.getTeamTotal();
             this.count = this.getDonationCount();
             this.donations = this.getDonations();
+            this.showEdit = (this.team.user_id === this.$store.state.auth.user.id);
           })
           .catch(e => {
             console.log(e);

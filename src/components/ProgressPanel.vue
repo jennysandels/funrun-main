@@ -6,7 +6,7 @@
           :model-value=this.getProgressValue()
           height="30"
           striped
-          color="deep-orange"
+          color="orange"
       >
         <template v-slot:default="{ value }">
           <strong>{{ Math.ceil(value) }}%</strong>

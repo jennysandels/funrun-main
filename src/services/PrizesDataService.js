@@ -21,5 +21,8 @@ class PrizesDataService {
     getByCampaignId(campaign_id) {
         return http.get(`/prizes/campaign/${campaign_id}`);
     }
+    getClassPrizes(campaign_id) {
+        return http.get(`/prizes/classroom/${campaign_id}`);
+    }
 }
 export default new PrizesDataService();

@@ -7,9 +7,10 @@ import 'bootstrap'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import store from "./store";
 import config from './config.js'
+import setupInterceptors from './services/setupInterceptors';
 
 loadFonts()
-
+setupInterceptors(store);
 createApp(App)
     .use(router)
     .use(vuetify)

@@ -30,39 +30,67 @@
       </v-row>
     </v-container>
     <v-container fluid>
-      <v-toolbar color="orange-darken-4">
+      <v-toolbar color="orange">
         <v-toolbar-title>Teams</v-toolbar-title>
-        <v-spacer></v-spacer>
-        <router-link to="/createTeam" v-slot="{createTeam}">
-          <v-btn @click="createTeam" @keypress.enter="createTeam">Create your team!</v-btn>
-        </router-link>
+          <v-btn to="/createTeam">Create your team!</v-btn>
       </v-toolbar>
-      <v-row dense>
-        <v-container v-model=this.teams>
-          <template v-for="team in teams" :key="team.name">
-            <v-col cols="3">
-              <TeamPanel :team="team"></TeamPanel>
+      <v-container v-model=this.teams>
+        <v-row>
+            <v-col v-for="team in teams" :key="team.name" cols="3">
+                <v-container>
+                  <v-card :title="team.name" :to="`/team/` + team.team_id" :subtitle="getTotalRaised(team.total)">
+                    <v-img :src="team.team_img"></v-img>
+                  </v-card>
+                </v-container>
             </v-col>
-          </template>
+        </v-row>
+      </v-container>
+    </v-container>
+    <v-container fluid>
+      <v-toolbar color="orange">
+        <v-toolbar-title>Classrooms</v-toolbar-title>
+      </v-toolbar>
+      <v-container v-model=this.teachers>
+        <v-row>
+          <v-col v-for="teacher in teachers" :key="teacher.name" cols="3">
+            <v-container>
+              <v-card :title="teacher.name" :to="`/teacher/` + teacher.teacher_id" :subtitle="getTotalRaised(teacher.total)">
+              </v-card>
+            </v-container>
+          </v-col>
+        </v-row>
+      </v-container>
+    </v-container>
+      <v-container fluid>
+        <v-toolbar color="orange">
+          <v-toolbar-title>Students</v-toolbar-title>
+        </v-toolbar>
+        <v-container v-model=this.students>
+          <v-row>
+            <v-col v-for="student in students" :key="student.student_id" cols="3">
+              <v-container>
+                <v-card :title="student.name" :to="`/student/` + student.student_id" :subtitle="getTotalRaised(student.total)">
+                </v-card>
+              </v-container>
+            </v-col>
+          </v-row>
         </v-container>
-      </v-row>
     </v-container>
   </v-main>
 </template>
 
 <script>
-import TeamPanel from "@/components/TeamPanel";
 import ProgressPanel from "@/components/ProgressPanel";
 import CampaignDataService from "@/services/CampaignDataService";
 import PrizesDataService from "@/services/PrizesDataService";
 import TeamsDataService from "@/services/TeamDataService";
-import DonationDataService from "@/services/DonationDataService";
+import TeacherDataService from "@/services/TeacherDataService";
+import StudentDataService from "@/services/StudentDataService";
 
 export default {
   name: "MainPage",
 
   components: {
-    TeamPanel,
     ProgressPanel
   },
   data()
@@ -72,10 +100,18 @@ export default {
       campaign_name: "Not yet set",
       description: "Not yet set",
       prizes: this.getPrizes(),
-      teams: this.getTeams()
+      teams: this.getTeams(),
+      teachers: this.getTeachers(),
+      students: this.getStudents()
     }
   },
   methods: {
+    getTotalRaised(total) {
+      if (total) {
+        return "$" + total + " raised"
+      }
+      return "$0 raised";
+    },
     getCampaign(id) {
       CampaignDataService.get(id)
           .then(response => {
@@ -102,32 +138,42 @@ export default {
             console.log(e);
           });
     },
-    getTeams() {
+    async getTeams() {
       // TODO: use config to get campaign id
       TeamsDataService.getByCampaignId(2)
-          .then(response => {
+          .then(async response => {
             console.log(response);
-            this.teams = [];
-            for (let i = 0; i < response.data.length; i++) {
-              var team = response.data[i];
-              team.total = this.getTeamTotal(team.team_id);
-              this.teams[i] = team;
-            }
+            this.teams = response.data;
+            return response.data;
           })
           .catch(e => {
             console.log(e);
           });
     },
-    getTeamTotal(team_id) {
-      DonationDataService.getTotalByTeam(team_id)
-          .then(response => {
-            console.log(response);
-            return response.data[0].total;
-          })
-          .catch(e => {
-            console.log(e);
-          });
+    async getTeachers() {
+      // TODO: use config to get campaign id
+      TeacherDataService.getByCampaignId(2)
+        .then(async response => {
+          console.log(response);
+          this.teachers = response.data;
+          return response.data;
+        })
+        .catch(e => {
+          console.log(e);
+        });
     },
+    async getStudents() {
+      // TODO: use config to get campaign id
+      StudentDataService.getByCampaign(2)
+        .then(async response => {
+          console.log(response);
+          this.students = response.data;
+          return response.data
+        })
+      .catch(e => {
+        console.log(e);
+      })
+    }
   }
 }
 </script>

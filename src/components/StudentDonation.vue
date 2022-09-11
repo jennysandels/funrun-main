@@ -1,79 +1,73 @@
 <template>
-<v-container>
-  <v-row>
-    <v-col cols="8">
-      <v-card class="form">
-        <v-card-title>Make a donation to {{ this.title }}</v-card-title>
-        <v-card-subtitle>for the {{ this.campaign_name }}</v-card-subtitle>
-        <v-container>
-          <v-text-field
-              label="Donation Amount"
-              placeholder="10.00"
-              prefix="$"
-              v-model="amount"
-          ></v-text-field>
-          <v-text-field
-              :value="this.title"
-          ></v-text-field>
-          <p>
-            <strong>Donor Information</strong>
-          </p>
-          <v-text-field
-              label="First Name"
-              v-model="first_name"
-              :rules="[rules.required]"
-          ></v-text-field>
-          <v-text-field
-              label="Last Name"
-              v-model="last_name"
-              :rules="[rules.required]"
-          ></v-text-field>
-          <v-text-field
-              v-model="email"
-              :rules="[rules.required, rules.email]"
-              label="E-mail"
-          ></v-text-field>
-          <v-textarea
-              v-model="message"
-              label="Include a message with your donation"
-          ></v-textarea>
-          <div id="card-container"></div>
-          <button type="button" ref="cardButton" class="btn btn__primary__lg">
-            Make Donation
-          </button>
-        </v-container>
-      </v-card>
-    </v-col>
-    <v-dialog
-        v-model="dialog"
-    >
-      <v-card>
-        <v-card-text>
-          {{ this.donationStatus }}
-        </v-card-text>
-        <v-card-actions>
-          <v-btn color="primary" block @click="dialog = false">Close Dialog</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-    <v-col cols="4">
-      <v-card>
-        <v-img :src="`http://localhost:8080/api/teams/image/` + this.team_id"></v-img>
-      </v-card>
-    </v-col>
-  </v-row>
-</v-container>
+  <v-container>
+    <v-row>
+      <v-col cols="8">
+        <v-card class="form">
+          <v-card-title>Make a donation to {{ this.student_name }}</v-card-title>
+          <v-card-subtitle>for the {{ this.campaign_name }}</v-card-subtitle>
+          <v-container>
+            <v-text-field
+                label="Donation Amount"
+                placeholder="10.00"
+                prefix="$"
+                v-model="amount"
+            ></v-text-field>
+            <v-text-field
+                :value="this.student_name"
+            ></v-text-field>
+            <p>
+              <strong>Donor Information</strong>
+            </p>
+            <v-text-field
+                label="First Name"
+                v-model="first_name"
+                :rules="[rules.required]"
+            ></v-text-field>
+            <v-text-field
+                label="Last Name"
+                v-model="last_name"
+                :rules="[rules.required]"
+            ></v-text-field>
+            <v-text-field
+                v-model="email"
+                :rules="[rules.required, rules.email]"
+                label="E-mail"
+            ></v-text-field>
+            <v-textarea
+                v-model="message"
+                label="Include a message with your donation"
+            ></v-textarea>
+            <div id="card-container"></div>
+            <button type="button" ref="cardButton" class="btn btn__primary__lg">
+              Make Donation
+            </button>
+          </v-container>
+        </v-card>
+      </v-col>
+      <v-dialog
+          v-model="dialog"
+      >
+        <v-card>
+          <v-card-text>
+            {{ this.donationStatus }}
+          </v-card-text>
+          <v-card-actions>
+            <v-btn color="primary" block @click="dialog = false">Close Dialog</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+    </v-row>
+  </v-container>
 </template>
 
 
 <script>
-import TeamDataService from "@/services/TeamDataService";
-import DonationDataService from "@/services/DonationDataService";
+import StudentDataService from "@/services/StudentDataService";
 import CampaignDataService from "@/services/CampaignDataService";
 import PaymentDataService from "@/services/PaymentDataService";
 
 export default {
-  name: "TeamDonation",
+  name: "ClassDonation",
   mounted() {
     let squareScript = document.createElement('script');
     squareScript.setAttribute('src', 'https://sandbox.web.squarecdn.com/v1/square.js');
@@ -86,8 +80,8 @@ export default {
       last_name: "",
       email: "",
       message: "",
-      team: this.getTeam(),
-      title: "Not yet set!",
+      student: this.getStudent(),
+      student_name: "",
       team_id: 0,
       goal: 0,
       total: 0,
@@ -130,16 +124,15 @@ export default {
         self.make_payment(tokenResult)
       })
     },
-    getTeam() {
-      TeamDataService.get(this.$route.params.team_id)
+    getStudent() {
+      StudentDataService.get(this.$route.params.student_id)
           .then(response => {
             console.log(response);
-            this.team = response.data;
-            this.title = this.team.name;
-            this.team_id = this.team.team_id;
-            this.goal = this.team.team_goal;
-            this.total = this.getTeamTotal();
-            this.campaign_id = this.team.campaign_id;
+            this.student = response.data[0];
+            this.student_id = this.student.student_id;
+            this.student_name = this.student.name;
+            this.total = this.student.total;
+            this.campaign_id = this.student.campaign_id;
             this.campaign_name = this.getCampaign(this.campaign_id);
           })
           .catch(e => {
@@ -155,7 +148,7 @@ export default {
         const payment = {
           campaign_id: this.campaign_id,
           location_id: this.locationId,
-          team_id: this.team_id,
+          student_id: this.student_id,
           source_id: tokenResult.token,
           amount: this.amount,
           first_name: this.first_name,
@@ -168,24 +161,12 @@ export default {
             .then(paymentResults => {
               this.displayPaymentResults('SUCCESS');
               console.debug('Payment Success', paymentResults);
-
             }).catch(e => {
           //cardButton.disabled = false;
           this.displayPaymentResults('FAILURE');
           console.error(e);
         });
       }
-    },
-    getTeamTotal() {
-      DonationDataService.getTotalByTeam(this.team_id)
-          .then(response => {
-            console.log(response);
-            this.total = response.data[0].total;
-            return response.data[0].total;
-          })
-          .catch(e => {
-            console.log(e);
-          });
     },
     getCampaign(id) {
       CampaignDataService.get(id)
@@ -200,11 +181,9 @@ export default {
     },
     displayPaymentResults(status) {
       if (status === 'SUCCESS') {
-        <v-alert type="success">Donation Successfully Received! Look for an email with a receipt. Thank you!</v-alert>
         this.donationStatus = "Donation Successfully Received! Look for an email with a receipt. Thank you!"
-        this.$router.push('../team/' + this.team_id);
+        this.$router.push('../student/' + this.student_id);
       } else {
-        <v-alert type="error">Donation was unsuccessful. Please try again or email support at jsandels@lrespto.org</v-alert>
         this.donationStatus = "Donation was unsuccessful. Please try again or email support at jsandels@lrespto.org"
       }
     }

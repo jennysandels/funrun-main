@@ -1,4 +1,5 @@
 import http from "../http-common";
+
 class TeamDataService {
     getAll() {
         return http.get("/teams");
@@ -22,7 +23,7 @@ class TeamDataService {
         return http.get(`/teams?id=${name}`);
     }
     getByCampaignId(campaign_id) {
-        return http.get(`/teams/campaign/${campaign_id}`)
+        return http.get(`/teams/campaign/${campaign_id}`);
     }
     getTeamImage(team_id) {
         return http.get(`/teams/image/${team_id}`)

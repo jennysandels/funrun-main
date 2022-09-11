@@ -21,15 +21,17 @@
           <Field name="password" type="password" class="form-control" />
           <ErrorMessage name="password" class="error-feedback" />
         </div>
-        <div class="form-group">
-          <button class="btn btn-primary btn-block" :disabled="loading">
-            <span
-                v-show="loading"
-                class="spinner-border spinner-border-sm"
-            ></span>
-            <span>Login</span>
-          </button>
-        </div>
+        <button class="btn btn-primary btn-block" :disabled="loading">
+          <span
+              v-show="loading"
+              class="spinner-border spinner-border-sm"
+          ></span>
+          <span>Login</span>
+        </button>
+          <p class="forgot-password text-right">
+            <router-link to="forgot">Forgot password?</router-link>
+          </p>
+
         <div class="form-group">
           <div v-if="message" class="alert alert-danger" role="alert">
             {{ message }}
@@ -44,6 +46,8 @@
 <script>
 import { Form, Field, ErrorMessage } from "vee-validate";
 import * as yup from "yup";
+import {SECRET} from "../config/development";
+import jwt from 'jwt-simple';
 export default {
   name: "Login",
   components: {
@@ -75,9 +79,14 @@ export default {
   methods: {
     handleLogin(user) {
       this.loading = true;
-      this.$store.dispatch("auth/login", user).then(
+      const encoded_password = jwt.encode(user.password, SECRET);
+      const encoded_user = {
+        email: user.email,
+        password: encoded_password
+      };
+      this.$store.dispatch("auth/login", encoded_user).then(
           () => {
-            this.$router.push("/profile");
+            this.$router.push(this.$route.query.redirect || '/');
           },
           (error) => {
             this.loading = false;
